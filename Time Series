@@ -1,0 +1,193 @@
+#### Pacotes
+source("/cloud/project/install_and_load_packages.R")
+
+#### CDI mensal  ####
+
+# Data
+dates <- c(as.Date('2018-06-01'), Sys.Date())
+
+# Usando API do Banco Central
+url_CDI <- paste0('http://api.bcb.gov.br/dados/serie/bcdata.sgs.4390/dados?formato=csv&dataInicial=',
+                  format(dates[1], '%d/%m/%Y'), '&dataFinal=', format(dates[2], '%d/%m/%Y'))
+CDI <- fread(url_CDI)
+CDI$data <- as.Date(CDI$data, format = '%d/%m/%Y')
+CDI$valor <- as.numeric(gsub(",", ".", gsub("\\.", "", CDI$valor)))
+
+#### Tickers Data ####
+
+# Coleta tickers desejados
+tickers <- list('^BVSP',"VALE3.SA","HGLG11.SA","VVAR3.SA","TRIS3.SA","KNRI11.SA","TRPL4.SA",
+                "ENAT3.SA","RENT3.SA","MOVI3.SA")
+
+# Gera arquivos xts para cara ticker da lista
+for (val in tickers) {
+  getSymbols(val, src = "yahoo", auto.assign = TRUE,
+                     from = '2018-08-01',to = '2020-08-01',
+                     return.class = 'xts', periodicity="monthly")
+}
+
+#### Retornos MENSAIS ####
+
+monthly_return<- periodReturn(BVSP[,6],type="log",period="monthly")
+monthly_return$Vale<- periodReturn(VALE3.SA[,6],type="log",period="monthly")
+monthly_return$HGLG<- periodReturn(HGLG11.SA[,6],type="log",period="monthly")
+monthly_return$VVAR3<- periodReturn(VVAR3.SA[,6],type="log",period="monthly")
+monthly_return$TRIS3<- periodReturn(TRIS3.SA[,6],type="log",period="monthly")
+monthly_return$KNRI11<- periodReturn(KNRI11.SA[,6],type="log",period="monthly")
+monthly_return$TRPL4<- periodReturn(TRPL4.SA[,6],type="log",period="monthly")
+monthly_return$ENAT3<- periodReturn(ENAT3.SA[,6],type="log",period="monthly")
+monthly_return$RENT3<- periodReturn(RENT3.SA[,6],type="log",period="monthly")
+monthly_return$MOVI3<- periodReturn(MOVI3.SA[,6],type="log",period="monthly")
+monthly_return$CDI <- log(1+CDI$valor/100)
+
+dygraphs::dygraph(monthly_return, main = "Retorno mensal",) %>% dyRangeSelector()%>%
+  dyHighlight(highlightCircleSize = 5, 
+              highlightSeriesBackgroundAlpha = 0.2,
+              hideOnMouseOut = FALSE)%>%
+  dyOptions(colors = RColorBrewer::brewer.pal(ncol(monthly_return), "Set2"))
+#Retornos ao quadrado
+dygraphs::dygraph(monthly_return^2, main = "Retorno mensal",) %>% dyRangeSelector()%>%
+  dyHighlight(highlightCircleSize = 5, 
+              highlightSeriesBackgroundAlpha = 0.2,
+              hideOnMouseOut = FALSE)%>%
+  dyOptions(colors = RColorBrewer::brewer.pal(ncol(monthly_return^2), "Set2"))
+
+#### Retornos DIÁRIOS ####
+
+for (val in tickers) {
+  getSymbols(val, src = "yahoo", auto.assign = TRUE,
+             from = '2018-08-01',to = '2020-08-01',return.class = 'xts', periodicity="daily")
+}
+
+BVSP<-na.omit(BVSP)
+VALE3.SA<-na.omit(VALE3.SA)
+HGLG11.SA<-na.omit(HGLG11.SA)
+VVAR3.SA<-na.omit(VVAR3.SA)
+TRIS3.SA<-na.omit(TRIS3.SA)
+KNRI11.SA<-na.omit(KNRI11.SA)
+TRPL4.SA<-na.omit(TRPL4.SA)
+ENAT3.SA<-na.omit(ENAT3.SA)
+RENT3.SA<-na.omit(RENT3.SA)
+MOVI3.SA<-na.omit(MOVI3.SA)
+
+daily_return<- periodReturn(BVSP[,6],type="log",period="daily")
+daily_return$Vale<- periodReturn(VALE3.SA[,6],type="log",period="daily")
+daily_return$HGLG<- periodReturn(HGLG11.SA[,6],type="log",period="daily")
+daily_return$VVAR3<- periodReturn(VVAR3.SA[,6],type="log",period="daily")
+daily_return$TRIS3<- periodReturn(TRIS3.SA[,6],type="log",period="daily")
+daily_return$KNRI11<- periodReturn(KNRI11.SA[,6],type="log",period="daily")
+daily_return$TRPL4<- periodReturn(TRPL4.SA[,6],type="log",period="daily")
+daily_return$ENAT3<- periodReturn(ENAT3.SA[,6],type="log",period="daily")
+daily_return$RENT3<- periodReturn(RENT3.SA[,6],type="log",period="daily")
+daily_return$MOVI3<- periodReturn(MOVI3.SA[,6],type="log",period="daily")
+
+dygraphs::dygraph(daily_return, main = "Retorno mensal",) %>% dyRangeSelector()%>%
+  dyHighlight(highlightCircleSize = 5, 
+              highlightSeriesBackgroundAlpha = 0.2,
+              hideOnMouseOut = FALSE)%>%
+  dyOptions(colors = RColorBrewer::brewer.pal(ncol(daily_return), "Set2"))
+#Retorno ao quadrado
+dygraphs::dygraph(daily_return^2, main = "Retorno mensal",) %>% dyRangeSelector()%>%
+  dyHighlight(highlightCircleSize = 5, 
+              highlightSeriesBackgroundAlpha = 0.2,
+              hideOnMouseOut = FALSE)%>%
+  dyOptions(colors = RColorBrewer::brewer.pal(ncol(daily_return^2), "Set2"))
+
+# Teste de hipóteses
+##Desvio padrão depende da natureza do ativo
+##Retorno médio de ações tende a ser maior do que o retorno de investimentos sem risco
+##Cauda de ações tende a ser negativo
+##Kurtosis de ações tende a ser superior a 3
+##Assimetria e Kurtosis para frequência de dados diferentes
+psych::describe(monthly_return)
+psych::describe(daily_return)
+
+#### Correlações ####
+
+## Teste com 2 tickers: Correlação entre Pt e Pt-1 [AR(1) Auto regressive model of order 1]
+
+#Teste de correlação de preço da VVAR3 diário
+acf(VVAR3.SA$VVAR3.SA.Adjusted, lag.max = NULL,type = c("correlation"),
+    plot = TRUE, na.action = na.fail, demean = TRUE)
+
+acf(VVAR3.SA$VVAR3.SA.Adjusted, lag.max = 10, plot = FALSE)
+
+#Teste de correlação de preço da TRIS3 diário
+acf(TRIS3.SA$TRIS3.SA.Adjusted, lag.max = NULL,type = c("correlation"),
+    plot = TRUE, na.action = na.fail, demean = TRUE)
+
+acf(TRIS3.SA$TRIS3.SA.Adjusted, lag.max = 10, plot = FALSE)
+
+## Teste com 1 ticker: Correlação entre Rt e Rt-1 [AR(1) Auto regressive model of order 1]
+
+#Teste de correlação de retorno da VVAR3 mensal
+acf(monthly_return$VVAR3, lag.max = NULL,type = c("correlation"),
+    plot = TRUE, na.action = na.fail, demean = TRUE)
+
+acf(monthly_return$VVAR3, lag.max = 10, plot = FALSE)
+
+#Teste de correlação de retorno da VVAR3 diário
+acf(daily_return$VVAR3, lag.max = NULL,type = c("correlation"),
+    plot = TRUE, na.action = na.fail, demean = TRUE)
+
+acf(daily_return$VVAR3, lag.max = 10, plot = FALSE)
+
+## Teste com 1 ticker: Correlação entre Rt^2 e Rt-1^2 [AR(1) Auto regressive model of order 1]
+
+#Teste de correlação de retorno da VVAR3 mensal
+acf(monthly_return$VVAR3^2, lag.max = NULL,type = c("correlation"),
+    plot = TRUE, na.action = na.fail, demean = TRUE)
+
+acf(monthly_return$VVAR3, lag.max = 10, plot = FALSE)
+
+#Teste de correlação de retorno da VVAR3 diário
+acf(daily_return$VVAR3^2, lag.max = NULL,type = c("correlation"),
+    plot = TRUE, na.action = na.fail, demean = TRUE)
+
+acf(daily_return$VVAR3, lag.max = 10, plot = FALSE)
+
+## Teste com 1 ticker: Correlação entre Rt^2 e Rt-1 [AR(1) Auto regressive model of order 1]
+
+#Teste de correlação de retorno da VVAR3 mensal
+cor(monthly_return$VVAR3[-1,]^2,lag(monthly_return$VVAR3,k=1)[-1,])
+
+#Teste de correlação de retorno da VVAR3 diário
+cor(daily_return$VVAR3[-1,]^2,lag(daily_return$VVAR3,k=1)[-1,])
+
+## Teste com 4 ticker: Correlação entre séries diferentes
+
+# Teste de correlação entre VVAR3;TRIS3 e ENAT3;HGLG11 mensal
+cor(monthly_return$VVAR3,monthly_return$TRIS3)
+cor(monthly_return$ENAT3,monthly_return$HGLG)
+
+# Compute a correlation matrix
+corr <- round(cor(monthly_return), 1)
+
+# Compute a matrix of correlation p-values
+p.mat <- cor_pmat(monthly_return)
+
+# Visualize the lower triangle of the correlation matrix
+# Barring the no significant coefficient
+corr.plot <- ggcorrplot(
+  corr, hc.order = TRUE, type = "lower", outline.col = "white",
+  p.mat = p.mat
+)
+corr.plot
+
+# Teste de correlação entre VVAR3;TRIS3 e ENAT3;HGLG11 diário
+cor(daily_return$VVAR3,daily_return$TRIS3)
+cor(daily_return$ENAT3,daily_return$HGLG)
+
+# Compute a correlation matrix
+corr <- round(cor(daily_return), 1)
+
+# Compute a matrix of correlation p-values
+p.mat <- cor_pmat(daily_return)
+
+# Visualize the lower triangle of the correlation matrix
+# Barring the no significant coefficient
+corr.plot <- ggcorrplot(
+  corr, hc.order = TRUE, type = "lower", outline.col = "white",
+  p.mat = p.mat
+)
+ggplotly(corr.plot)
